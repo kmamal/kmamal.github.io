@@ -6,7 +6,9 @@
 <script src="https://unpkg.com/isomorphic-git@1.24.3"></script>
 <script type="module">
 import http from 'https://unpkg.com/isomorphic-git@beta/http/web/index.js'
-	
+
+console.log("start")
+
 const Fs = new LightningFS('fs')
 const DIR = '/'
 
@@ -21,6 +23,6 @@ await git.clone({
 	depth: 1
 })
 
-await pfs.readdir(dir)
+console.log(await pfs.readdir(dir))
 
 </script>
