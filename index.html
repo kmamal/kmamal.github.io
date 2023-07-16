@@ -1,28 +1,172 @@
 <!DOCTYPE html>
 <head>
-<link rel="icon" href="/favicon.png" sizes="any" type="image/png">
+<link rel="icon" href="favicon.png" sizes="any" type="image/png">
+<style>
+body {
+	margin: 0;
+	padding: 30px 0 0 0;
+	position: relative;
+
+	text-align: center;
+
+	font: 12px monospace;
+	color: rgba(0, 0, 0, 0.9);
+	background: rgba(255, 255, 255, 0.95);
+}
+#fixed {
+	position: fixed;
+	top: 0;
+	width: 100%;
+	margin: 0;
+	padding: 10px 15px;
+
+	background: rgb(50, 50, 50);
+	color: rgba(255, 255, 255, 0.95);
+	font-weight: bold;
+}
+.container {
+	width: 90%;
+	margin: 10px auto;
+
+	text-align: left;
+
+	border: 2px solid rgba(0, 0, 0, 0.5);
+	border-radius: 15px;
+	overflow: hidden;
+}
+.header {
+	margin: 0;
+	padding: 10px 15px;
+
+	background: rgba(0, 0, 0, 0.5);
+	color: rgba(255, 255, 255, 0.95);
+	font-weight: bold;
+}
+.content {
+	margin: 0;
+	padding: 15px;
+
+	white-space: pre-wrap;
+	tab-size: 2;
+}
+</style>
 </head>
-<script src="https://unpkg.com/@isomorphic-git/lightning-fs@4.6.0"></script>
-<script src="https://unpkg.com/isomorphic-git@1.24.3"></script>
+<body><div id="fixed"></div></body>
 <script type="module">
-import http from 'https://unpkg.com/isomorphic-git@beta/http/web/index.js'
+/* global window, document */
 
-console.log("start")
+const handlePath = async (path) => {
+	const container$ = document.createElement('div')
+	container$.className = 'container'
 
-const Fs = new LightningFS('fs')
-const DIR = '/'
+	const header$ = document.createElement('p')
+	header$.className = 'header'
+	header$.innerText = `/${path}`
+	container$.appendChild(header$)
 
-await git.clone({
-	fs: Fs,
-	http,
-	dir: DIR,
-	corsProxy: 'https://cors.isomorphic-git.org',
-	url: 'https://github.com/kmamal/kmamal.github.io',
-	ref: 'master',
-	singleBranch: true,
-	depth: 1
-})
+	const content$ = document.createElement('div')
+	content$.className = 'content'
+	container$.appendChild(content$)
 
-console.log(await Fs.promises.readdir(DIR))
+	document.body.appendChild(container$)
+
+	const res = await fetch(path)
+	const file = await res.blob()
+
+	header$.innerText += `· ${file.size.toLocaleString()} bytes`
+
+	let child$
+	if (file.type.startsWith('image/')) {
+		child$ = document.createElement('img')
+		child$.className = 'image'
+		child$.setAttribute('src', URL.createObjectURL(file))
+	} else if (file.type.startsWith('audio/')) {
+		child$ = document.createElement('audio')
+		child$.className = 'audio'
+		child$.setAttribute('src', URL.createObjectURL(file))
+	} else if (file.type.startsWith('video/')) {
+		child$ = document.createElement('video')
+		child$.className = 'video'
+		child$.setAttribute('src', URL.createObjectURL(file))
+	} else if (false
+		|| file.type.startsWith('text/')
+		|| file.type.endsWith('/javascript')
+		|| file.type.endsWith('/json')
+		|| file.type.endsWith('/xml')
+		|| file.type.endsWith('+xml')
+	) {
+		child$ = document.createElement('span')
+		child$.className = 'text'
+		child$.innerText = await file.text()
+	} else {
+		child$ = document.createElement('span')
+		child$.className = 'binary'
+		const bytes = Array.from(new Uint8Array(await file.slice(0, 256).arrayBuffer()))
+		child$.innerText = bytes
+			.map((x) => x.toString(16).padStart(2, '0'))
+			.join(' ')
+	}
+	content$.appendChild(child$)
+}
+
+{
+	const response = await fetch('index.txt')
+	const reader = response.body.getReader()
+	let buffer = ''
+	const decoder = new TextDecoder()
+	for (;;) {
+		const { value: chunk, done } = await reader.read()
+		if (done) { break }
+		buffer += decoder.decode(chunk)
+		const lines = buffer.split('\n')
+		buffer = lines.pop()
+		const paths = lines.filter((line) => line && !line.startsWith('#'))
+		for (const path of paths) { handlePath(path) }
+	}
+	buffer = buffer.trim()
+	if (buffer && !buffer.startsWith('#')) { handlePath(buffer) }
+}
+
+
+const loadScript = async (src, module = false) => {
+	const script$ = document.createElement('script')
+	script$.setAttribute('src', src)
+	script$.setAttribute('async', false)
+	if (module) { script$.setAttribute('type', 'module') }
+	document.head.appendChild(script$)
+	await new Promise((resolve) => {
+		script$.addEventListener('load', resolve)
+	})
+}
+window.loadScript = loadScript
+
+const message$ = document.getElementById('fixed')
+
+const showError = (message) => {
+	message$.innerText = message
+	throw new Error(message)
+}
+window.showError = showError
+
+const showMessage = (message) => {
+	message$.innerText = message
+}
+window.showMessage = showMessage
+
+const prefix = 'backend-config-'
+let foundBackend = false
+for (let i = 0; i < window.localStorage.length; i++) {
+	const key = window.localStorage.key(i)
+	if (!key.startsWith(prefix)) { continue }
+	const backend = key.slice(prefix.length)
+
+	window.showMessage(`Loading ${backend} libraries...`)
+
+	loadScript(`backends/${backend}.js`, true)
+	foundBackend = true
+	break
+}
+
+if (!foundBackend) { showMessage('No backend config found. Read-only mode.') }
 
 </script>
