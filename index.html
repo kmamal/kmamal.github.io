@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <head>
 <link rel="icon" href="favicon.png" sizes="any" type="image/png">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
 body {
 	margin: 0;
@@ -25,7 +26,7 @@ body {
 	font-weight: bold;
 }
 .container {
-	width: 90%;
+	max-width: 800px;
 	margin: 10px auto;
 
 	text-align: left;
@@ -45,15 +46,43 @@ body {
 .content {
 	margin: 0;
 	padding: 15px;
-
+}
+.content .text {
 	white-space: pre-wrap;
 	tab-size: 2;
+}
+.content .markdown {
+	font: 15px sans-serif;
+}
+.content .markdown ol,ul {
+	padding-left: 20px;
+}
+.content .markdown pre {
+	font: 12px monospace;
+	padding: 10px;
+	background: rgba(0, 0, 0, 0.2);
+}
+.content .markdown code {
+	font: 12px monospace;
+	padding: 5px;
+	background: rgba(0, 0, 0, 0.2);
+}
+.content .markdown pre code {
+	background: none;
+	padding: 0;
+}
+.content textarea {
+	width: 100%;
+	padding: 10px;
+	line-height: 1.3;
 }
 </style>
 </head>
 <body><div id="fixed"></div></body>
 <script type="module">
-/* global window, document */
+/* global window, document, marked */
+
+let editable = false
 
 const handlePath = async (path) => {
 	const container$ = document.createElement('div')
@@ -95,9 +124,51 @@ const handlePath = async (path) => {
 		|| file.type.endsWith('/xml')
 		|| file.type.endsWith('+xml')
 	) {
-		child$ = document.createElement('span')
-		child$.className = 'text'
-		child$.innerText = await file.text()
+		let className = 'text'
+		let getText = (view$) => view$.innerText
+		let setText = (view$, text) => { view$.innerText = text }
+		if (file.type === 'text/markdown') {
+			className = 'markdown'
+			getText = (view$) => view$.getAttribute('data-text')
+			setText = (view$, text) => {
+				view$.innerHTML = marked.parse(text)
+				view$.setAttribute('data-text', text)
+			}
+		}
+
+		const makeView = (text) => {
+			const view$ = document.createElement('span')
+			view$.className = className
+			setText(view$, text)
+			container$.onmousedown = () => {
+				if (!editable) { return }
+				container$.onmousedown = null
+				const edit$ = makeEdit(getText(view$))
+				content$.innerHTML = ''
+				content$.appendChild(edit$)
+			}
+			return view$
+		}
+
+		const makeEdit = (text) => {
+			const edit$ = document.createElement('textarea')
+			edit$.className = 'text'
+			edit$.value = text
+			edit$.setAttribute('rows', text.split('\n').length)
+			edit$.onblur = () => {
+				const view$ = makeView(edit$.value)
+				content$.innerHTML = ''
+				content$.appendChild(view$)
+			}
+			const scroll = window.scrollY
+			setTimeout(() => {
+				edit$.focus()
+				window.scrollTo(0, scroll)
+			}, 0)
+			return edit$
+		}
+
+		child$ = makeView(await file.text())
 	} else {
 		child$ = document.createElement('span')
 		child$.className = 'binary'
@@ -152,6 +223,12 @@ const showMessage = (message) => {
 	message$.innerText = message
 }
 window.showMessage = showMessage
+
+window.makeEditable = () => {
+	editable = true
+}
+
+window.removeAll = () => { document.body.innerHTML = '' }
 
 const prefix = 'backend-config-'
 let foundBackend = false

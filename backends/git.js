@@ -14,6 +14,7 @@ const { repo, branch = 'master', token } = parsedGitConfig
 if (!repo) { window.showError('Error in git-config: repo not set') }
 if (!token) { window.showError('Error in git-config: token not set') }
 
+window.makeEditable()
 window.showMessage(`Syncing to ${repo}`)
 
 const fs = new LightningFS('fs', { wipe: true })
@@ -45,6 +46,10 @@ window.writeFile = async (path, data) => {
 			depth: 1,
 		})
 		isInitialized = true
+
+		if (parsedGitConfig.replace) {
+			window.removeAll()
+		}
 	}
 
 	const batched = [ ...batch.entries() ]

@@ -1,4 +1,5 @@
 favicon.png
+README.md
 index.txt
 index.html
 backends/git.js
